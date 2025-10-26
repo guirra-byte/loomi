@@ -6,7 +6,6 @@ interface CreateUserRequest {
   name: string;
   email: string;
   password: string;
-  role?: "ADMIN" | "CUSTOMER";
 }
 
 interface CreateUserResponse {
@@ -34,7 +33,7 @@ export class CreateUserUseCase {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        role: data.role || "CUSTOMER",
+        role: "CUSTOMER",
       },
     });
 
