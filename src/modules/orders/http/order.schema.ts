@@ -21,9 +21,11 @@ export const orderSchemas = {
     summary: 'Update the status of an order',
     description: 'Update the status of an order',
     tags: ['orders'],
+    params: z.object({
+      id: z.string(),
+    }),
     body: z.object({
-      orderId: z.string(),
-      status: z.enum(OrderStatus),
+      status: z.nativeEnum(OrderStatus),
     }),
     response: {
       200: z.object({ id: z.string() }),
