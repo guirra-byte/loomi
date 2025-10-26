@@ -2,6 +2,7 @@ import rabbitmqClient from '@/core/libs/rabbitmq/client';
 import { makeOrderCreated } from './make-order-created';
 
 async function orderCreatedConsumer() {
+  console.log('[order-created] consumer is running...');
   const { channel } = await rabbitmqClient;
   channel.assertQueue('order.created', { durable: true });
   channel.consume('order.created', async (message) => {

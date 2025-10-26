@@ -1,6 +1,6 @@
-import { PixPaymentStatus, PrismaClient } from "@prisma/client";
+import { OrderStatus, PixPaymentStatus, PrismaClient } from "@prisma/client";
 import { AbacatepayService } from "@/core/providers/abacatepay/services/abacatepay.service";
-import { OrderNotFoundError } from "../../errors";
+import { OrderNotFoundError, OrderNotOpenError } from "../../errors";
 
 export class OrderCreated {
   constructor(
@@ -20,21 +20,21 @@ export class OrderCreated {
       throw new OrderNotFoundError();
     }
 
+    if (order.status !== OrderStatus.OPEN) {
+      throw new OrderNotOpenError(`Order ${orderId} is not open`);
+    }
+
     const orderPayment = await this.prisma.orderPayment.findUnique({
       where: { orderId: orderId },
+      include: {
+        qrCodePixPayment: true,
+      },
     });
 
     if (orderPayment) {
-      const activePix = await this.prisma.qrCodePixPayment.findFirst({
-        where: {
-          OrderPayment: {
-            id: orderPayment.id,
-          },
-          status: PixPaymentStatus.PENDING,
-        },
-      });
-
+      const activePix = orderPayment.qrCodePixPayment;
       const isExpired = activePix?.expiresAt && activePix.expiresAt < new Date();
+
       if (activePix && isExpired) {
         await this.prisma.qrCodePixPayment.update({
           where: { id: activePix.id },
@@ -60,14 +60,19 @@ export class OrderCreated {
           orderId: orderId,
           qrCodePixPayment: {
             create: {
-              id: qrCodePixPayment.id,
-              brCode: qrCodePixPayment.brCode,
-              brCodeBase64: qrCodePixPayment.brCodeBase64,
-              abacatepayTaxId: qrCodePixPayment.id,
+              id: qrCodePixPayment.data.id,
+              brCode: qrCodePixPayment.data.brCode,
+              brCodeBase64: '',
+              abacatepayTaxId: qrCodePixPayment.data.id,
               expiresAt: new Date(Date.now() + 300000),
             },
           },
         },
+      });
+
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.PENDING_PAYMENT },
       });
 
       const orderItems = order.items.map(async (item) => {
