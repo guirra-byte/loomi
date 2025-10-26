@@ -30,7 +30,7 @@ model Customer {
   userId String @unique
 
   name     String
-  email    String @unique
+  email    String
   password String
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -72,7 +72,7 @@ model Order {
   paymentId String?       @unique @map("payment_id")
   payment   OrderPayment? @relation(fields: [paymentId], references: [id])
 
-  customerId String   @unique
+  customerId String   @unique @map("customer_id")
   customer   Customer @relation(fields: [customerId], references: [id])
 }
 
@@ -97,10 +97,10 @@ enum PixPaymentStatus {
 }
 
 model QrCodePixPayment {
-  id              String @id @default(uuid()) @map("id")
-  brCode          String @unique @map("br_code")
-  brCodeBase64    String @unique @map("br_code_base64")
-  abacatepayTaxId String @unique @map("abacatepay_tax_id")
+  id              String  @id @default(uuid()) @map("id")
+  brCode          String  @unique @map("br_code")
+  brCodeBase64    String? @map("br_code_base64")
+  abacatepayTaxId String  @unique @map("abacatepay_tax_id")
 
   expiresAt DateTime         @map("expires_at")
   status    PixPaymentStatus @default(PENDING) @map("status")
@@ -113,8 +113,8 @@ model QrCodePixPayment {
 model OrderItem {
   id String @id @default(uuid()) @map("id")
 
-  orderId   String @unique @map("order_id")
-  productId String @unique @map("product_id")
+  orderId   String @map("order_id")
+  productId String @map("product_id")
 
   unityPrice Float @map("unity_price")
   quantity   Int   @default(1) @map("quantity")
@@ -125,4 +125,6 @@ model OrderItem {
 
   product Product @relation(fields: [productId], references: [id])
   order   Order   @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId, productId])
 }
