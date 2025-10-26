@@ -11,6 +11,9 @@ export class OrderCreated {
   async execute(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: {
+        items: true,
+      },
     });
 
     if (!order) {
@@ -66,6 +69,15 @@ export class OrderCreated {
           },
         },
       });
+
+      const orderItems = order.items.map(async (item) => {
+        await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity as number } },
+        });
+      });
+
+      await Promise.all(orderItems);
     }
     catch (error) {
       throw error;
