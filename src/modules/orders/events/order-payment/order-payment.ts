@@ -47,7 +47,7 @@ export class OrderPayment {
         const paymentSimulation = await this.abacatepayService
           .simulatePixPayment(qrCodePixPayment.abacatepayTaxId);
 
-        if (paymentSimulation.status === PixPaymentStatus.PAID) {
+        if (paymentSimulation.data.status === PixPaymentStatus.PAID) {
           await this.prisma.orderPayment.update({
             where: { id: orderPayment.id },
             data: {
