@@ -11,7 +11,13 @@ export const authSchemas = {
       password: z.string(),
     }),
     response: {
-      200: z.object(),
+      200: z.object({
+        status: z.boolean(),
+        message: z.string(),
+        data: z.object({
+          token: z.string(),
+        }),
+      }),
       400: errorSchema,
       500: errorSchema,
     },

@@ -12,11 +12,27 @@ export class AuthController {
       const useLoginUseCase = makeLogin();
 
       const token = await useLoginUseCase.execute(email, password);
-      res.status(200).send({ token });
-    } catch (error) {
+      return res.status(200).send({
+        status: true,
+        message: 'Login successful',
+        data: { token },
+      });
+    } catch (error: unknown) {
       if (error instanceof AppError) {
-        res.status(error.statusCode).send(error);
+        return res.status(error.statusCode).send({
+          status: false,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+        });
       }
+
+      return res.status(500).send({
+        status: false,
+        message: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 }
