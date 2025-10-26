@@ -7,18 +7,8 @@ export class OrdersRepository implements IOrderRepository {
     return this.prisma.order.create({
       data: {
         customerId: order.customerId,
-        products: {
-          connect: order.products.map((product) => ({ id: product.id })),
-        },
         total: order.total,
-        items: {
-          create: order.products.map((product) => ({
-            productId: product.id,
-            quantity: product.quantity,
-            subtotal: product.subtotal,
-          })),
-        },
-        status: OrderStatus.PENDING,
+        status: OrderStatus.OPEN,
       },
     });
   }
