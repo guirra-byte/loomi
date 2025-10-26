@@ -49,23 +49,20 @@ model Product {
 
   createdAt            DateTime    @default(now()) @map("created_at")
   updatedAt            DateTime    @updatedAt @map("updated_at")
-  includedInOrders     Order[]
   includedInOrderItems OrderItem[]
 }
 
 enum OrderStatus {
   PENDING
-  DELIVERED
-  PROCESSING
-  SHIPPED
+  PAID
+  CANCELLED
 }
 
 model Order {
-  id       String      @id @default(uuid())
-  products Product[]
-  items    OrderItem[]
-  total    Float
-  status   OrderStatus @default(PENDING)
+  id     String      @id @default(uuid())
+  items  OrderItem[]
+  total  Float
+  status OrderStatus @default(PENDING)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -112,12 +109,14 @@ model QrCodePixPayment {
 }
 
 model OrderItem {
-  id        String @id @default(uuid()) @map("id")
+  id String @id @default(uuid()) @map("id")
+
   orderId   String @unique @map("order_id")
   productId String @unique @map("product_id")
 
-  quantity Int   @default(1) @map("quantity")
-  subtotal Float @map("subtotal")
+  unityPrice Float @map("unity_price")
+  quantity   Int   @default(1) @map("quantity")
+  subtotal   Float @map("subtotal")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
