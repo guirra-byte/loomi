@@ -1,20 +1,21 @@
 import Axios from "axios";
 import { CreatePixPaymentRequest, CreatePixPaymentResponse, SimulatePixPaymentResponse } from "../../type";
+import { config } from "dotenv";
 
+config();
 export class AbacatepayService {
   private readonly api: Axios.AxiosInstance;
 
   constructor() {
-    const { ABACATEPAY_BASE_URL, ABACATEPAY_API_KEY } = process.env;
-    if (!ABACATEPAY_BASE_URL || !ABACATEPAY_API_KEY) {
-      throw new Error('ABACATEPAY_BASE_URL or ABACATEPAY_API_KEY is not set');
+    if (!process.env.ABACATEPAY_API_BASE_URL || !process.env.ABACATEPAY_API_KEY) {
+      throw new Error('ABACATEPAY_API_BASE_URL or ABACATEPAY_API_KEY is not set');
     }
 
     this.api = Axios.create({
-      baseURL: ABACATEPAY_BASE_URL,
+      baseURL: process.env.ABACATEPAY_API_BASE_URL,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ABACATEPAY_API_KEY}`,
+        'Authorization': `Bearer ${process.env.ABACATEPAY_API_KEY}`,
       },
     });
   }
@@ -22,6 +23,7 @@ export class AbacatepayService {
   async createPixPayment(data: CreatePixPaymentRequest): Promise<CreatePixPaymentResponse> {
     const response = await this.api.post('/pixQrCode/create', {
       ...data,
+      amount: Math.round(Number(data.amount)),
     });
 
     return response.data as CreatePixPaymentResponse;
