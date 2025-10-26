@@ -1,4 +1,6 @@
 import appInstance from "./app";
+import "./modules/orders/events/order-created/order-created.consumer";
+import "./modules/orders/events/order-payment/order-payment.consumer";
 
 appInstance.listen({ port: 3000 }, (err: Error | null, address: string) => {
   if (err) {

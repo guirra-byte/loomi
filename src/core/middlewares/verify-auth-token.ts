@@ -1,8 +1,8 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import jwt from "jsonwebtoken";
 import { config } from "dotenv";
+import jwt from "jsonwebtoken";
 import redisClient from "../libs/redis/client";
-import { UnauthorizedError } from "../errors/verify-auth-token-error";
+import { TokenExpiredError, TokenInvalidError, UnauthorizedError } from "../errors/verify-auth-token-error";
 import { Role } from "@prisma/client";
 import prisma from "@/core/libs/prisma/client";
 import { AppError } from "../errors/app-error";
@@ -26,6 +26,25 @@ export async function verifyAuthToken(req: FastifyRequest, res: FastifyReply) {
         const payload = jwt.verify(authToken, jwtSecret) as { userId: string };
         decoded = { userId: payload.userId };
       } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+          console.log("Token expirado:", error.message);
+          return res.status(401).send({
+            status: false,
+            message: new TokenExpiredError().message,
+            code: new TokenExpiredError().code,
+            expiredAt: error.expiredAt,
+          });
+        }
+
+        if (error instanceof jwt.JsonWebTokenError) {
+          console.log("Token inválido:", error.message);
+          return res.status(401).send({
+            status: false,
+            message: new TokenInvalidError().message,
+            code: new TokenInvalidError().code,
+          });
+        }
+
         throw error;
       }
 
@@ -45,10 +64,11 @@ export async function verifyAuthToken(req: FastifyRequest, res: FastifyReply) {
         await redis.set(
           `user:${decoded.userId}`,
           JSON.stringify({ token: authToken, role: user.role }),
-          { EX: 60 * 60 * 24 }
+          { expiration: { value: 60 * 60 * 24, type: 'EX' } }
         );
 
         req.user = { id: user.id, role: user.role };
+        console.log("req.user", req.user);
       } else {
         const { role } = JSON.parse(cachedUserToken) as { role: Role };
         req.user = { id: decoded.userId, role };
@@ -63,6 +83,7 @@ export async function verifyAuthToken(req: FastifyRequest, res: FastifyReply) {
         });
       }
 
+      console.error("Error verifying auth token:", error);
       return res.status(500).send({
         status: false,
         message: 'Internal server error',
