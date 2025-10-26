@@ -1,6 +1,7 @@
 import { Order, PrismaClient } from "@prisma/client";
 import { CreateOrderData, IOrderRepository } from "../../repositories/IOrderRepository";
 import { OrderOutOfStockError, OrderProductNotFoundError } from "../../errors";
+import rabbitmqClient from "@/core/libs/rabbitmq/client";
 
 interface NewOrderRequest {
   customerId: string;
@@ -86,6 +87,11 @@ export class NewOrderUseCase {
 
     try {
       const createdOrder = await this.orderRepository.createOrder(mountOrderData);
+
+      const { channel } = await rabbitmqClient;
+      channel.assertQueue('order.created', { durable: true });
+      channel.sendToQueue('order.created', Buffer.from(JSON.stringify({ orderId: createdOrder.id })));
+
       Array.from(orderItems.values()).map(async (item) => {
         await this.prisma.product.update({
           where: { id: item.id },
