@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+model User {
+  id String @id @default(uuid())
+
+  name     String
+  email    String @unique
+  password String
+  role     Role   @default(CUSTOMER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Customer {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  name     String
+  email    String @unique
+  password String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+}
+
+model Product {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String
+
+  price Float
+  stock Int   @default(0)
+
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  includedInOrders     Order[]
+  includedInOrderItems OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  DELIVERED
+  PROCESSING
+  SHIPPED
+}
+
+model Order {
+  id       String      @id @default(uuid())
+  products Product[]
+  total    Float
+  status   OrderStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customerId String      @unique
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  items      OrderItem[]
+}
+
+model OrderItem {
+  id        String @id @default(uuid()) @map("id")
+  orderId   String @unique @map("order_id")
+  productId String @unique @map("product_id")
+
+  quantity Int   @default(1) @map("quantity")
+  subtotal Float @map("subtotal")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+}
