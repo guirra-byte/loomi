@@ -1,4 +1,4 @@
-import { Order, PrismaClient } from "@prisma/client";
+import { OrderStatus, PrismaClient } from "@prisma/client";
 import { CreateOrderData, IOrderRepository } from "../../repositories/IOrderRepository";
 import { OrderOutOfStockError, OrderProductNotFoundError } from "../../errors";
 import rabbitmqClient from "@/core/libs/rabbitmq/client";
@@ -24,7 +24,7 @@ export class NewOrderUseCase {
     private readonly prisma: PrismaClient
   ) { }
 
-  async execute(orderRequest: NewOrderRequest): Promise<Order> {
+  async execute(orderRequest: NewOrderRequest): Promise<string> {
     const orderItems = new Map<string, OrderItem>();
     orderRequest.products.map((product) => {
       if (orderItems.has(product.id)) {
@@ -86,21 +86,41 @@ export class NewOrderUseCase {
     };
 
     try {
-      const createdOrder = await this.orderRepository.createOrder(mountOrderData);
+      const haveOpenOrder = await this.prisma.order.findFirst({
+        where: {
+          customerId: orderRequest.customerId,
+          status: OrderStatus.PENDING,
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      let orderId = '';
+      if (!haveOpenOrder) {
+        const createdOrder = await this.orderRepository.createOrder(mountOrderData);
+        orderId = createdOrder.id;
+      } else {
+        await this.prisma.order.update({
+          where: { id: haveOpenOrder.id },
+          data: {
+            items: {
+              create: order.map((item) => ({ productId: item.id, quantity: item.quantity, subtotal: item.subtotal, unityPrice: item.price })),
+            },
+            total: haveOpenOrder.items.reduce((acc, item) => acc + item.subtotal, 0) + order.reduce((acc, item) => acc + item.subtotal, 0),
+          },
+        });
+
+        orderId = haveOpenOrder.id;
+      }
+
+      orderItems.clear();
 
       const { channel } = await rabbitmqClient;
       channel.assertQueue('order.created', { durable: true });
-      channel.sendToQueue('order.created', Buffer.from(JSON.stringify({ orderId: createdOrder.id })));
+      channel.sendToQueue('order.created', Buffer.from(JSON.stringify({ orderId })));
 
-      Array.from(orderItems.values()).map(async (item) => {
-        await this.prisma.product.update({
-          where: { id: item.id },
-          data: { stock: { decrement: item.quantity } },
-        });
-      });
-
-      orderItems.clear();
-      return createdOrder;
+      return orderId;
     } catch (error) {
       throw error;
     }
