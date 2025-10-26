@@ -1,7 +1,6 @@
 import { OrderStatus, PrismaClient } from "@prisma/client";
 import { CreateOrderData, IOrderRepository } from "../../repositories/IOrderRepository";
 import { OrderOutOfStockError, OrderProductNotFoundError } from "../../errors";
-import rabbitmqClient from "@/core/libs/rabbitmq/client";
 
 interface NewOrderRequest {
   customerId: string;
@@ -18,7 +17,7 @@ interface OrderItemWithPriceAndSubtotal extends OrderItem {
   subtotal: number;
 }
 
-export class NewOrderUseCase {
+export class NewOrderItemUseCase {
   constructor(
     private readonly orderRepository: IOrderRepository,
     private readonly prisma: PrismaClient
@@ -89,7 +88,7 @@ export class NewOrderUseCase {
       const haveOpenOrder = await this.prisma.order.findFirst({
         where: {
           customerId: orderRequest.customerId,
-          status: OrderStatus.PENDING,
+          status: OrderStatus.OPEN,
         },
         include: {
           items: true,
@@ -115,10 +114,6 @@ export class NewOrderUseCase {
       }
 
       orderItems.clear();
-
-      const { channel } = await rabbitmqClient;
-      channel.assertQueue('order.created', { durable: true });
-      channel.sendToQueue('order.created', Buffer.from(JSON.stringify({ orderId })));
 
       return orderId;
     } catch (error) {
