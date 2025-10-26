@@ -1,26 +1,35 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { AppError } from "../errors/app-error";
 import jwt from "jsonwebtoken";
 import { config } from "dotenv";
 import redisClient from "../libs/redis/client";
-import prisma from "../libs/prisma/client";
 import { UnauthorizedError } from "../errors/verify-auth-token-error";
 import { Role } from "@prisma/client";
+import prisma from "@/core/libs/prisma/client";
+import { AppError } from "../errors/app-error";
 
 config();
 export async function verifyAuthToken(req: FastifyRequest, res: FastifyReply) {
-  try {
-    const authorizationHeader = req.headers.authorization;
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret || !authorizationHeader) {
-      throw new UnauthorizedError();
-    }
+  const authorizationHeader = req.headers.authorization;
+  const jwtSecret = process.env.JWT_SECRET;
 
-    if (authorizationHeader) {
-      const [, authToken] = authorizationHeader.split(' ');
+  if (!jwtSecret || !authorizationHeader) {
+    throw new UnauthorizedError();
+  }
+
+  if (authorizationHeader) {
+    const [, authToken] = authorizationHeader.split(' ');
+
+    try {
+      let decoded: { userId: string };
+
+      try {
+        const payload = jwt.verify(authToken, jwtSecret) as { userId: string };
+        decoded = { userId: payload.userId };
+      } catch (error) {
+        throw error;
+      }
+
       const redis = await redisClient;
-
-      const decoded = jwt.verify(authToken, jwtSecret) as { userId: string };
       const cachedUserToken = await redis.get(`user:${decoded.userId}`);
       if (!cachedUserToken) {
         const user = await prisma.user.findUnique({
@@ -44,12 +53,21 @@ export async function verifyAuthToken(req: FastifyRequest, res: FastifyReply) {
         const { role } = JSON.parse(cachedUserToken) as { role: Role };
         req.user = { id: decoded.userId, role };
       }
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).send({
+          status: false,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+        });
+      }
 
-      return res.status(200).send({ message: 'Token is valid' });
-    }
-  } catch (error) {
-    if (error instanceof AppError) {
-      res.status(error.statusCode).send(error);
+      return res.status(500).send({
+        status: false,
+        message: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR',
+      });
     }
   }
 }
