@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: loomi_root
+      POSTGRES_PASSWORD: loomi_root
+      POSTGRES_DB: loomi_ecommerce_mvp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_broker
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: loomi_root
+      RABBITMQ_DEFAULT_PASS: loomi_root
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
