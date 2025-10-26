@@ -1,5 +1,5 @@
 import { errorSchema } from "@/core/errors/app-error";
-import { z } from "zod/v4/classic";
+import { z } from "zod/v4";
 
 export const authSchemas = {
   login: {
