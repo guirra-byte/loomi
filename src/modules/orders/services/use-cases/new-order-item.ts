@@ -1,6 +1,7 @@
 import { OrderStatus, PrismaClient } from "@prisma/client";
 import { CreateOrderData, IOrderRepository } from "../../repositories/IOrderRepository";
 import { OrderOutOfStockError, OrderProductNotFoundError } from "../../errors";
+import { CustomerNotFoundError } from "@/modules/customer/errors";
 
 interface NewOrderRequest {
   customerId: string;
@@ -24,6 +25,16 @@ export class NewOrderItemUseCase {
   ) { }
 
   async execute(orderRequest: NewOrderRequest): Promise<string> {
+    const customer = await this.prisma.customer.findUnique({
+      where: {
+        userId: orderRequest.customerId,
+      },
+    });
+
+    if (!customer) {
+      throw new CustomerNotFoundError();
+    }
+
     const orderItems = new Map<string, OrderItem>();
     orderRequest.products.map((product) => {
       if (orderItems.has(product.id)) {
@@ -68,18 +79,27 @@ export class NewOrderItemUseCase {
           throw result.reason;
         } else if (result.status === 'fulfilled') {
           const { item } = result.value as { item: OrderItemWithPriceAndSubtotal };
-          order.push({
-            id: item.id,
-            price: item.price,
-            quantity: item.quantity,
-            subtotal: item.subtotal,
-          });
+          if (item.quantity > 0) {
+            const orderItemIndex = order.findIndex((orderItem) => orderItem.id === item.id);
+
+            if (orderItemIndex >= 0) {
+              order[orderItemIndex].quantity += item.quantity;
+              order[orderItemIndex].subtotal += item.subtotal;
+            } else {
+              order.push({
+                id: item.id,
+                quantity: item.quantity,
+                subtotal: item.subtotal,
+                price: item.price,
+              });
+            }
+          }
         }
       });
     });
 
     const mountOrderData: CreateOrderData = {
-      customerId: orderRequest.customerId,
+      customerId: customer.id,
       products: order,
       total: order.reduce((acc, item) => acc + item.subtotal, 0),
     };
@@ -87,7 +107,7 @@ export class NewOrderItemUseCase {
     try {
       const haveOpenOrder = await this.prisma.order.findFirst({
         where: {
-          customerId: orderRequest.customerId,
+          customerId: customer.id,
           status: OrderStatus.OPEN,
         },
         include: {
@@ -100,21 +120,49 @@ export class NewOrderItemUseCase {
         const createdOrder = await this.orderRepository.createOrder(mountOrderData);
         orderId = createdOrder.id;
       } else {
+        for (const item of order) {
+          const existingItem = haveOpenOrder.items.find(
+            (orderItem) => orderItem.productId === item.id
+          );
+
+          if (existingItem) {
+            await this.prisma.orderItem.update({
+              where: { id: existingItem.id },
+              data: {
+                quantity: existingItem.quantity + item.quantity,
+                subtotal: existingItem.subtotal + item.subtotal,
+              },
+            });
+          } else {
+            await this.prisma.orderItem.create({
+              data: {
+                orderId: haveOpenOrder.id,
+                productId: item.id,
+                quantity: item.quantity,
+                subtotal: item.subtotal,
+                unityPrice: item.price,
+              },
+            });
+          }
+        }
+
+        const updatedOrder = await this.prisma.order.findUnique({
+          where: { id: haveOpenOrder.id },
+          include: { items: true },
+        });
+
         await this.prisma.order.update({
           where: { id: haveOpenOrder.id },
           data: {
-            items: {
-              create: order.map((item) => ({ productId: item.id, quantity: item.quantity, subtotal: item.subtotal, unityPrice: item.price })),
-            },
-            total: haveOpenOrder.items.reduce((acc, item) => acc + item.subtotal, 0) + order.reduce((acc, item) => acc + item.subtotal, 0),
+            total: updatedOrder!.items.reduce((acc, item) => acc + item.subtotal, 0),
           },
         });
 
         orderId = haveOpenOrder.id;
       }
 
+      console.log("orderId", orderId);
       orderItems.clear();
-
       return orderId;
     } catch (error) {
       throw error;
