@@ -1,14 +1,18 @@
+import { PixPaymentStatus } from "@prisma/client";
+
 export type CreatePixPaymentResponse = {
-  id: string;
-  amount: number;
-  status: "PENDING" | "PAID" | "EXPIRED" | "CANCELLED" | "REFUNDED";
-  devMode: boolean;
-  brCode: string;
-  brCodeBase64: string;
-  platformFee: number;
-  createdAt: string;
-  updatedAt: string;
-  expiresAt: string;
+  data: {
+    id: string;
+    amount: number;
+    status: PixPaymentStatus;
+    devMode: boolean;
+    brCode: string;
+    brCodeBase64: string;
+    platformFee: number;
+    createdAt: string;
+    updatedAt: string;
+    expiresAt: string;
+  }
 };
 
 export type SimulatePixPaymentResponse = CreatePixPaymentResponse;
