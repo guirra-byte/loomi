@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+model User {
+  id String @id @unique @default(uuid())
+
+  name     String
+  email    String @unique
+  password String
+  role     Role   @default(CUSTOMER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+
+model Customer {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  name     String
+  email    String
+  password String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+}
+
+model Product {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String
+
+  price Float
+  stock Int   @default(0)
+
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  includedInOrderItems OrderItem[]
+}
+
+enum OrderStatus {
+  OPEN
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  CLOSED
+}
+
+model Order {
+  id     String      @id @default(uuid())
+  items  OrderItem[]
+  total  Float
+  status OrderStatus @default(OPEN)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  paymentId String?       @unique @map("payment_id")
+  payment   OrderPayment? @relation(fields: [paymentId], references: [id])
+
+  customerId String   @unique @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
+
+model OrderPayment {
+  id      String @id @default(uuid()) @map("id")
+  orderId String @unique @map("order_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  qrCodePixPaymentId String           @unique @map("qr_code_pix_payment_id")
+  qrCodePixPayment   QrCodePixPayment @relation(fields: [qrCodePixPaymentId], references: [id])
+  Order              Order?
+}
+
+enum PixPaymentStatus {
+  PENDING
+  EXPIRED
+  CANCELLED
+  PAID
+  REFUNDED
+}
+
+model QrCodePixPayment {
+  id              String  @id @default(uuid()) @map("id")
+  brCode          String  @unique @map("br_code")
+  brCodeBase64    String? @map("br_code_base64")
+  abacatepayTaxId String  @unique @map("abacatepay_tax_id")
+
+  expiresAt DateTime         @map("expires_at")
+  status    PixPaymentStatus @default(PENDING) @map("status")
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  OrderPayment OrderPayment?
+}
+
+model OrderItem {
+  id String @id @default(uuid()) @map("id")
+
+  orderId   String @map("order_id")
+  productId String @map("product_id")
+
+  unityPrice Float @map("unity_price")
+  quantity   Int   @default(1) @map("quantity")
+  subtotal   Float @map("subtotal")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId, productId])
+}
