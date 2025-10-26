@@ -1,6 +1,7 @@
 import { PrismaClient, Role } from "@prisma/client";
 import { UserAlreadyExistsError, UserNotFoundError } from "../../errors";
 import bcrypt from "bcrypt";
+import redisClient from "@/core/libs/redis/client";
 
 interface UpdateUserRequest {
   name?: string;
@@ -56,6 +57,9 @@ export class UpdateUserUseCase {
         ...(data.role && requestingUserRole === Role.ADMIN && { role: data.role }),
       },
     });
+
+    const redis = await redisClient;
+    await redis.del(`user:${userId}`);
 
     return {
       id: updatedUser.id,
