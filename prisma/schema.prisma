@@ -14,7 +14,7 @@ enum Role {
 }
 
 model User {
-  id String @id @default(uuid())
+  id String @id @unique @default(uuid())
 
   name     String
   email    String @unique
@@ -53,16 +53,18 @@ model Product {
 }
 
 enum OrderStatus {
-  PENDING
+  OPEN
+  PENDING_PAYMENT
   PAID
   CANCELLED
+  CLOSED
 }
 
 model Order {
   id     String      @id @default(uuid())
   items  OrderItem[]
   total  Float
-  status OrderStatus @default(PENDING)
+  status OrderStatus @default(OPEN)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
